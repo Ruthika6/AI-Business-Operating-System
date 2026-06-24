@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6 animate-slide-up">
+    <!-- Top Row: SaaS Metric cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 dashboard-grid">
+        <!-- Card 1: Total Revenue -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-3 text-white/5 group-hover:text-white/10 transition-colors">
+                <i class="fas fa-wallet text-5xl"></i>
+            </div>
+            <div class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total Revenue</div>
+            <div class="text-3xl font-bold mt-2 text-slate-100 font-heading" id="metric-total-revenue">$248,500</div>
+            <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+                <i class="fas fa-caret-up"></i>
+                <span>+12.4% vs last Q</span>
+            </div>
+        </div>
+
+        <!-- Card 2: Monthly Recurring Revenue (MRR) -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-3 text-white/5 group-hover:text-white/10 transition-colors">
+                <i class="fas fa-rotate text-5xl"></i>
+            </div>
+            <div class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Monthly Recurring Revenue</div>
+            <div class="text-3xl font-bold mt-2 text-indigo-400 font-heading" id="metric-mrr">$32,400</div>
+            <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+                <i class="fas fa-caret-up"></i>
+                <span>+8.2% MoM growth</span>
+            </div>
+        </div>
+
+        <!-- Card 3: LTV : CAC Ratio -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-3 text-white/5 group-hover:text-white/10 transition-colors">
+                <i class="fas fa-scale-balanced text-5xl"></i>
+            </div>
+            <div class="text-xs text-slate-400 font-semibold uppercase tracking-wider">LTV : CAC Ratio</div>
+            <div class="text-3xl font-bold mt-2 text-purple-400 font-heading" id="metric-ratio">13.3x</div>
+            <div class="text-xs text-slate-400 mt-2">
+                CLV: <span class="text-slate-200 font-semibold">$2,400</span> &middot; CAC: <span class="text-slate-200 font-semibold">$180</span>
+            </div>
+        </div>
+
+        <!-- Card 4: Active Customers -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-3 text-white/5 group-hover:text-white/10 transition-colors">
+                <i class="fas fa-users text-5xl"></i>
+            </div>
+            <div class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Active Customers</div>
+            <div class="text-3xl font-bold mt-2 text-cyan-400 font-heading" id="metric-active-customers">142</div>
+            <div class="text-xs text-cyan-400 mt-2 flex items-center gap-1">
+                <i class="fas fa-check-circle"></i>
+                <span>3.8% Conversion Rate</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Section: Charts and Recommendations -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Revenue Chart Widget -->
+        <div class="glass-panel p-5 lg:col-span-2 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-base font-bold text-slate-200 font-heading"><i class="fas fa-chart-area mr-2 text-indigo-400"></i>Revenue vs Targets & Leads</h3>
+                <span class="text-xs text-slate-400">Year to Date (Jan - Jun)</span>
+            </div>
+            <div class="h-64 relative w-full">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <!-- CEO Strategic Recommendations -->
+        <div class="glass-panel p-5 flex flex-col justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-200 mb-4 font-heading"><i class="fas fa-lightbulb mr-2 text-yellow-400 animate-pulse"></i>Strategic Recommendations</h3>
+                <div class="space-y-3" id="recommendations-list">
+                    <!-- Shimmer Loader -->
+                    <div class="shimmer-loading h-20 w-full rounded-xl"></div>
+                    <div class="shimmer-loading h-20 w-full rounded-xl"></div>
+                    <div class="shimmer-loading h-20 w-full rounded-xl"></div>
+                </div>
+            </div>
+            <button onclick="refreshRecommendations()" class="mt-4 w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 font-semibold text-xs border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl transition-all flex items-center justify-center gap-2">
+                <i class="fas fa-arrows-rotate"></i> Refresh Recommendations
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom Section: CEO Copilot Q&A Advisor -->
+    <div class="glass-panel p-6 relative">
+        <div class="border-b border-white/5 pb-4 mb-4 flex items-center gap-3">
+            <div class="h-8 w-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                <i class="fas fa-user-doctor text-indigo-400"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-200 font-heading">CEO Copilot — Strategic Q&A Advisor</h3>
+                <p class="text-xs text-slate-400">Query Gemini regarding SaaS metrics, support tickets bottlenecks, or CRM lead focus.</p>
+            </div>
+        </div>
+
+        <!-- Chat Q&A Panel -->
+        <div class="space-y-4">
+            <!-- Output Area -->
+            <div id="copilot-output" class="min-h-[100px] max-h-[300px] overflow-y-auto p-4 rounded-xl bg-slate-950/40 border border-white/5 text-sm text-slate-300 leading-relaxed font-body">
+                <div class="text-slate-400 italic flex items-center gap-2">
+                    <i class="fas fa-info-circle text-indigo-400"></i>
+                    Ask a question below. E.g. "Generate a growth summary" or "Show operational risks"
+                </div>
+            </div>
+
+            <!-- Input Form -->
+            <form id="copilot-form" onsubmit="askCopilot(event)" class="flex gap-3">
+                <input type="text" id="copilot-input" required placeholder="Ask CEO Advisor... (e.g. 'What is our financial performance overview?')" class="glass-input flex-grow px-4 py-3 rounded-xl text-sm font-medium text-slate-200">
+                <button type="submit" id="copilot-submit" class="btn-primary px-6 rounded-xl flex items-center gap-2 text-sm font-bold">
+                    <span>Ask Advisor</span>
+                    <i class="fas fa-paper-plane text-xs"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentChart = null;
+
+    // Load initial dashboard metrics and chart data
+    async function loadDashboard() {
+        try {
+            const data = await apiFetch("/api/dashboard");
+            
+            // Populate metric cards
+            document.getElementById("metric-total-revenue").textContent = formatCurrency(data.metrics.totalRevenue);
+            document.getElementById("metric-mrr").textContent = formatCurrency(data.metrics.monthlyRecurringRevenue);
+            
+            // Build Recommendations
+            renderRecommendations(data.recommendations);
+            
+            // Initialize Chart
+            initChart(data.revenueHistory);
+            
+        } catch (error) {
+            console.error("Dashboard Loading Error:", error);
+            showToast("Failed to load dashboard metrics", "error");
+        }
+    }
+
+    function renderRecommendations(recs) {
+        const list = document.getElementById("recommendations-list");
+        list.innerHTML = "";
+        
+        if (!recs || recs.length === 0) {
+            list.innerHTML = `<div class="text-xs text-slate-400 italic">No recommendations active.</div>`;
+            return;
+        }
+
+        recs.forEach(r => {
+            let impactClass = "badge-glow-medium";
+            if (r.impact === "High") impactClass = "badge-glow-critical";
+            else if (r.impact === "Low") impactClass = "badge-glow-low";
+
+            const item = document.createElement("div");
+            item.className = "p-3 rounded-xl border border-white/5 bg-white/[0.02] space-y-2";
+            item.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-indigo-300 font-heading">${escapeHTML(r.title)}</span>
+                    <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${impactClass}">${escapeHTML(r.impact)}</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">${escapeHTML(r.description)}</p>
+                <div class="text-[10px] text-slate-300 bg-indigo-500/10 p-2 rounded-lg border border-indigo-500/10">
+                    <span class="font-bold text-indigo-400">Action:</span> ${escapeHTML(r.actionable_step)}
+                </div>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function initChart(history) {
+        const ctx = document.getElementById('revenueChart').getContext('2d');
+        
+        const labels = history.map(h => h.month);
+        const revenues = history.map(h => h.revenue);
+        const targets = history.map(h => h.target);
+        
+        if (currentChart) {
+            currentChart.destroy();
+        }
+
+        currentChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'MRR Growth ($)',
+                        data: revenues,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Target revenue ($)',
+                        data: targets,
+                        borderColor: '#a855f7',
+                        borderDash: [5, 5],
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#94a3b8',
+                            font: { family: 'Outfit', size: 11 }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 10 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 10 } }
+                    }
+                }
+            }
+        });
+    }
+
+    async function refreshRecommendations() {
+        const list = document.getElementById("recommendations-list");
+        list.innerHTML = `
+            <div class="shimmer-loading h-20 w-full rounded-xl"></div>
+            <div class="shimmer-loading h-20 w-full rounded-xl"></div>
+            <div class="shimmer-loading h-20 w-full rounded-xl"></div>
+        `;
+        
+        try {
+            const data = await apiFetch("/api/dashboard");
+            renderRecommendations(data.recommendations);
+            showToast("Strategic recommendations updated", "success");
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // CEO Copilot Q&A
+    async function askCopilot(event) {
+        event.preventDefault();
+        const input = document.getElementById("copilot-input");
+        const submitBtn = document.getElementById("copilot-submit");
+        const output = document.getElementById("copilot-output");
+        
+        const question = input.value.trim();
+        if (!question) return;
+        
+        // Disable input & show loading spinner
+        input.disabled = true;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+            <div class="lds-ring"><div></div><div></div><div></div><div></div></div>
+            <span>Analyzing...</span>
+        `;
+        output.innerHTML = `
+            <div class="flex items-center gap-3 text-indigo-400 text-sm">
+                <i class="fas fa-spinner animate-spin"></i>
+                CEO advisor is synthesizing response using Gemini...
+            </div>
+        `;
+        
+        try {
+            const res = await apiFetch("/api/copilot/query", {
+                method: "POST",
+                body: JSON.stringify({ question: question })
+            });
+            
+            // Format response (convert markdown headers/bullets dynamically to html)
+            let formatted = escapeHTML(res.answer)
+                .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-slate-100 mt-3 mb-1 font-heading">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 class="text-lg font-bold text-slate-100 mt-4 mb-2 font-heading">$1</h2>')
+                .replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc text-slate-300 my-1">$1</li>')
+                .replace(/^- (.*$)/gim, '<li class="ml-4 list-disc text-slate-300 my-1">$1</li>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong class="text-indigo-300 font-semibold">$1</strong>')
+                .replace(/\n/g, '<br>');
+                
+            output.innerHTML = `
+                <div class="space-y-2">
+                    <div class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider flex items-center justify-between mb-2">
+                        <span>Advisor Synthesis</span>
+                        <span>Model: ${res.model}</span>
+                    </div>
+                    <div>${formatted}</div>
+                </div>
+            `;
+            
+            input.value = "";
+            showToast("Advisory synthesis completed", "success");
+            
+        } catch (error) {
+            output.innerHTML = `<div class="text-rose-400 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to generate advisor insights: ${error.message}</div>`;
+        } finally {
+            input.disabled = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `
+                <span>Ask Advisor</span>
+                <i class="fas fa-paper-plane text-xs"></i>
+            `;
+        }
+    }
+
+    // Auto-load on page mount
+    window.addEventListener("DOMContentLoaded", loadDashboard);
+</script>
+{% endblock %}

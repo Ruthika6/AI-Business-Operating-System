@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top Row: Title & Actions -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <p class="text-sm text-slate-400">Track pipeline conversion, score prospects, and generate email copy.</p>
+        </div>
+        <button onclick="toggleLeadModal(true)" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-plus text-xs"></i> Add New Lead
+        </button>
+    </div>
+
+    <!-- Main CRM Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Leads Datagrid Panel (Left) -->
+        <div class="glass-panel p-5 lg:col-span-2 flex flex-col justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-200 mb-4 font-heading"><i class="fas fa-list-check mr-2 text-indigo-400"></i>Active Prospect pipeline</h3>
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead>
+                            <tr class="border-b border-white/5 text-slate-400 text-xs font-semibold uppercase">
+                                <th class="py-3 px-2">Prospect</th>
+                                <th class="py-3 px-2">Segment</th>
+                                <th class="py-3 px-2">Lead Score</th>
+                                <th class="py-3 px-2">Status</th>
+                                <th class="py-3 px-2 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-table-body">
+                            {% for l in leads %}
+                            <tr class="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                                <td class="py-3 px-2">
+                                    <div class="font-bold text-slate-200">{{ l.name }}</div>
+                                    <div class="text-xs text-slate-400">{{ l.company or 'Individual' }} &middot; {{ l.email }}</div>
+                                </td>
+                                <td class="py-3 px-2 text-xs text-slate-300">{{ l.segment or 'Startup' }}</td>
+                                <td class="py-3 px-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                            <div class="h-full rounded-full bg-indigo-500" style="width: {{ l.score }}%"></div>
+                                        </div>
+                                        <span class="font-bold text-xs">{{ l.score }}</span>
+                                    </div>
+                                </td>
+                                <td class="py-3 px-2">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider 
+                                    {% if l.status == 'Qualified' %} bg-emerald-500/10 text-emerald-300 border border-emerald-500/20
+                                    {% elif l.status == 'Contacted' %} bg-cyan-500/10 text-cyan-300 border border-cyan-500/20
+                                    {% else %} bg-slate-500/10 text-slate-300 border border-slate-500/20 {% endif %}">
+                                        {{ l.status }}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-2 text-right space-x-1">
+                                    <button onclick="scoreLead({{ l.id }})" title="Score Lead" class="p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 rounded-lg text-xs transition-all">
+                                        <i class="fas fa-calculator"></i>
+                                    </button>
+                                    <button onclick="prepareOutreach('{{ l.name }}', '{{ l.company }}', '{{ l.segment }}', '{{ l.email }}')" title="Compose Outreach" class="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/20 rounded-lg text-xs transition-all">
+                                        <i class="fas fa-envelope"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-slate-400 italic">No prospects found. Click 'Add New Lead' to begin.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Scoring Diagnostics Panel (Right) -->
+        <div class="glass-panel p-5 flex flex-col justify-between">
+            <div>
+                <div class="border-b border-white/5 pb-3 mb-4 flex items-center justify-between">
+                    <h3 class="text-base font-bold text-slate-200 font-heading"><i class="fas fa-square-poll-vertical mr-2 text-indigo-400"></i>AI Scoring Details</h3>
+                    <span id="score-badge" class="hidden text-xs px-2 py-0.5 rounded-full font-bold"></span>
+                </div>
+                
+                <div id="scoring-placeholder" class="text-xs text-slate-400 italic py-8 text-center">
+                    <i class="fas fa-info-circle text-indigo-400 block text-2xl mb-2"></i>
+                    Select the calculator icon <i class="fas fa-calculator"></i> on a lead to generate Gemini insights.
+                </div>
+                
+                <div id="scoring-content" class="hidden space-y-4 text-xs leading-relaxed">
+                    <div class="flex items-center gap-3">
+                        <div class="text-5xl font-black text-indigo-400 font-heading" id="score-large-number">92</div>
+                        <div>
+                            <div class="font-bold text-slate-200">Category Evaluation</div>
+                            <div class="text-slate-400" id="score-category-text">Hot Lead (Tier 1)</div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-bold text-slate-200 mb-1.5"><i class="fas fa-plus-circle text-emerald-400 mr-1.5"></i>Positive Indicators</h4>
+                        <ul class="space-y-1 text-slate-300" id="score-positives"></ul>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-bold text-slate-200 mb-1.5"><i class="fas fa-minus-circle text-rose-400 mr-1.5"></i>Risk Concerns</h4>
+                        <ul class="space-y-1 text-slate-300" id="score-concerns"></ul>
+                    </div>
+                    
+                    <div class="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20">
+                        <h4 class="font-bold text-indigo-400 mb-1 uppercase tracking-wider text-[9px]">AI Action Recommendation</h4>
+                        <p class="text-slate-200" id="score-recommendation"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row: Outbound Email Generator -->
+    <div class="glass-panel p-6">
+        <div class="border-b border-white/5 pb-4 mb-4">
+            <h3 class="text-base font-bold text-slate-200 font-heading"><i class="fas fa-wand-magic-sparkles mr-2 text-indigo-400"></i>AI Cold Outreach Personalizer</h3>
+            <p class="text-xs text-slate-400">Personalize a converting B2B proposal for target leads instantly using Gemini.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <!-- Email Inputs (Left) -->
+            <form id="email-form" onsubmit="generateEmail(event)" class="lg:col-span-2 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Recipient Name</label>
+                    <input type="text" id="email-lead-name" required placeholder="e.g. Sarah Jenkins" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Company Target</label>
+                    <input type="text" id="email-company" required placeholder="e.g. Apex Global" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Segment</label>
+                        <select id="email-segment" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                            <option value="Enterprise">Enterprise</option>
+                            <option value="Mid-Market">Mid-Market</option>
+                            <option value="SMB">SMB</option>
+                            <option value="Startup">Startup</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Outreach Goal</label>
+                        <input type="text" id="email-purpose" placeholder="e.g. 10min demo call" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Custom Context Notes</label>
+                    <textarea id="email-notes" placeholder="e.g. Met at TechCrunch, interested in sandbox trial" rows="3" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm"></textarea>
+                </div>
+                <button type="submit" id="email-submit" class="w-full btn-primary py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm">
+                    <span>Generate Email</span>
+                    <i class="fas fa-magic text-xs"></i>
+                </button>
+            </form>
+
+            <!-- Email Output (Right) -->
+            <div class="lg:col-span-3 flex flex-col justify-between">
+                <div class="flex-grow flex flex-col justify-between bg-slate-950/40 border border-white/5 rounded-xl p-4 min-h-[300px]">
+                    <div id="email-output-box" class="text-sm font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-all">
+                        <div class="text-slate-400 italic font-body flex items-center gap-2 h-full justify-center py-24">
+                            <i class="fas fa-info-circle text-indigo-400"></i> Fill the inputs and click generate.
+                        </div>
+                    </div>
+                    <button id="copy-email-btn" onclick="copyEmailText()" class="hidden mt-4 w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-xl transition-all font-semibold text-xs flex items-center justify-center gap-2">
+                        <i class="fas fa-copy"></i> Copy outreach email to clipboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Lead Modal Overlay -->
+<div id="lead-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md p-6 bg-slate-900/90 relative animate-slide-up">
+        <!-- Close Button -->
+        <button onclick="toggleLeadModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 class="text-lg font-bold text-slate-100 mb-4 font-heading border-b border-white/5 pb-2">Add New CRM Prospect</h3>
+        <form onsubmit="saveLead(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Prospect Name</label>
+                <input type="text" id="modal-name" required placeholder="e.g. Sarah Jenkins" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Company</label>
+                    <input type="text" id="modal-company" required placeholder="e.g. Apex Global" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Email</label>
+                    <input type="email" id="modal-email" required placeholder="e.g. sarah@apexgl.com" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Segment</label>
+                    <select id="modal-segment" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                        <option value="Enterprise">Enterprise</option>
+                        <option value="Mid-Market">Mid-Market</option>
+                        <option value="SMB">SMB</option>
+                        <option value="Startup">Startup</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Status</label>
+                    <select id="modal-status" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                        <option value="New">New</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Qualified">Qualified</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Lead Context Notes</label>
+                <textarea id="modal-notes" placeholder="Additional details..." rows="3" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm"></textarea>
+            </div>
+            <button type="submit" class="w-full btn-primary py-3 rounded-xl font-bold text-sm">
+                Save Lead
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleLeadModal(show) {
+        const modal = document.getElementById("lead-modal");
+        modal.classList.toggle("hidden", !show);
+    }
+
+    // Save lead through API
+    async function saveLead(event) {
+        event.preventDefault();
+        const payload = {
+            name: document.getElementById("modal-name").value,
+            company: document.getElementById("modal-company").value,
+            email: document.getElementById("modal-email").value,
+            segment: document.getElementById("modal-segment").value,
+            status: document.getElementById("modal-status").value,
+            notes: document.getElementById("modal-notes").value,
+            score: 50
+        };
+
+        try {
+            await apiFetch("/api/sales/leads", {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+            showToast("Lead successfully registered", "success");
+            toggleLeadModal(false);
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // Score a lead
+    async function scoreLead(leadId) {
+        const placeholder = document.getElementById("scoring-placeholder");
+        const content = document.getElementById("scoring-content");
+        const badge = document.getElementById("score-badge");
+        
+        placeholder.innerHTML = `
+            <div class="flex items-center gap-3 text-indigo-400 text-sm justify-center py-12">
+                <i class="fas fa-spinner animate-spin text-lg"></i>
+                Calculating lead score with Gemini...
+            </div>
+        `;
+        placeholder.classList.remove("hidden");
+        content.classList.add("hidden");
+        badge.classList.add("hidden");
+
+        try {
+            // Call post API
+            const data = await apiFetch(`/api/sales/score/${leadId}`, {
+                method: "POST"
+            });
+            const details = data.scoring_details;
+
+            placeholder.classList.add("hidden");
+            content.classList.remove("hidden");
+            badge.classList.remove("hidden");
+
+            // Fill details
+            document.getElementById("score-large-number").textContent = details.score;
+            document.getElementById("score-category-text").textContent = details.category;
+            
+            badge.textContent = `${details.score}%`;
+            badge.className = "text-xs px-2 py-0.5 rounded-full font-bold " + 
+                (details.score >= 80 ? "badge-glow-critical" : details.score >= 55 ? "badge-glow-medium" : "badge-glow-low");
+
+            // Positives list
+            const posList = document.getElementById("score-positives");
+            posList.innerHTML = "";
+            details.positives.forEach(p => {
+                posList.innerHTML += `<li class="flex items-start gap-2 my-1"><span class="text-emerald-400 font-bold">&bull;</span> <span>${escapeHTML(p)}</span></li>`;
+            });
+
+            // Concerns list
+            const conList = document.getElementById("score-concerns");
+            conList.innerHTML = "";
+            details.concerns.forEach(c => {
+                conList.innerHTML += `<li class="flex items-start gap-2 my-1"><span class="text-rose-400 font-bold">&bull;</span> <span>${escapeHTML(c)}</span></li>`;
+            });
+
+            document.getElementById("score-recommendation").textContent = details.recommendation;
+            
+            showToast("Prospect lead analysis complete", "success");
+            
+        } catch (error) {
+            placeholder.innerHTML = `<div class="text-rose-400 text-xs py-12 text-center"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to generate scores: ${error.message}</div>`;
+        }
+    }
+
+    // Prep outreach input fields
+    function prepareOutreach(name, company, segment, email) {
+        document.getElementById("email-lead-name").value = name;
+        document.getElementById("email-company").value = company;
+        document.getElementById("email-segment").value = segment || "Enterprise";
+        document.getElementById("email-purpose").value = "10min introducing demo";
+        
+        // Scroll to outreach box
+        document.getElementById("email-form").scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Generate B2B cold email copy
+    async function generateEmail(event) {
+        event.preventDefault();
+        const submitBtn = document.getElementById("email-submit");
+        const output = document.getElementById("email-output-box");
+        const copyBtn = document.getElementById("copy-email-btn");
+
+        const payload = {
+            leadName: document.getElementById("email-lead-name").value,
+            company: document.getElementById("email-company").value,
+            segment: document.getElementById("email-segment").value,
+            purpose: document.getElementById("email-purpose").value,
+            notes: document.getElementById("email-notes").value
+        };
+
+        // Enable spinner
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<div class="lds-ring"><div></div><div></div><div></div><div></div></div> <span>Composing...</span>`;
+        output.innerHTML = `
+            <div class="text-slate-400 italic font-body flex items-center gap-2 justify-center py-24">
+                <i class="fas fa-spinner animate-spin text-lg text-indigo-400"></i> Composing cold email copy via Gemini...
+            </div>
+        `;
+        copyBtn.classList.add("hidden");
+
+        try {
+            const data = await apiFetch("/api/sales/email", {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+
+            output.textContent = data.email;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span>Generate Email</span> <i class="fas fa-magic text-xs"></i>`;
+            copyBtn.classList.remove("hidden");
+            
+            showToast("Outreach proposal composed successfully", "success");
+
+        } catch (error) {
+            output.innerHTML = `<div class="text-rose-400 font-body text-xs text-center py-24"><i class="fas fa-exclamation-triangle mr-2"></i>Failed: ${error.message}</div>`;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span>Generate Email</span> <i class="fas fa-magic text-xs"></i>`;
+        }
+    }
+
+    function copyEmailText() {
+        const text = document.getElementById("email-output-box").textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Email copy copied to clipboard", "success");
+        }).catch(err => {
+            console.error(err);
+        });
+    }
+</script>
+{% endblock %}

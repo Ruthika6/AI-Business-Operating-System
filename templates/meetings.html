@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <p class="text-sm text-slate-400">Summarize conference calls, extract decisions, outline assignments, and track action items.</p>
+
+    <!-- Main Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Summarize Transcript Form (Left) -->
+        <div class="glass-panel p-5">
+            <h3 class="text-base font-bold text-slate-200 mb-4 font-heading"><i class="fas fa-file-invoice mr-2 text-indigo-400"></i>Summarize Meeting Transcript</h3>
+            <form onsubmit="submitTranscript(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Meeting Title</label>
+                    <input type="text" id="meeting-title" required placeholder="e.g. Sales Pipeline Sync" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Raw Transcript Draft</label>
+                    <textarea id="meeting-transcript" required placeholder="Paste speaker dialogue or transcripts..." rows="10" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm font-mono"></textarea>
+                </div>
+                <button type="submit" id="summarize-submit" class="w-full btn-primary py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm">
+                    <span>Analyze Transcript</span>
+                    <i class="fas fa-microchip text-xs"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Meeting Archive & Action Items (Right) -->
+        <div class="glass-panel p-5 lg:col-span-2 space-y-6">
+            <!-- Part 1: Action Items Tasks Checklist -->
+            <div>
+                <h3 class="text-base font-bold text-slate-200 mb-4 font-heading"><i class="fas fa-list-check mr-2 text-indigo-400"></i>Assigned Action Items Checklist</h3>
+                <div class="space-y-2.5" id="action-items-list">
+                    {% set has_actions = false %}
+                    {% for m in meetings %}
+                        {% for a in m.action_items %}
+                            {% set has_actions = true %}
+                            <div class="p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] flex items-center justify-between gap-4">
+                                <div class="flex items-start gap-3">
+                                    <input type="checkbox" onclick="toggleActionItem({{ a.id }}, this)" {% if a.status == 'Completed' %} checked {% endif %} class="mt-1 h-4.5 w-4.5 rounded border-white/10 text-indigo-600 focus:ring-indigo-500 bg-slate-900">
+                                    <div>
+                                        <p class="text-xs text-slate-200 {% if a.status == 'Completed' %} line-through text-slate-500 {% endif %}" id="action-text-{{ a.id }}">{{ a.text }}</p>
+                                        <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                                            <span>Owner: <strong class="text-slate-300">{{ a.assignee }}</strong></span>
+                                            <span>&middot;</span>
+                                            <span>Due: <strong class="text-indigo-400">{{ a.due_date }}</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="text-[9px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded font-bold uppercase truncate max-w-[120px]">{{ m.title }}</span>
+                            </div>
+                        {% endfor %}
+                    {% endfor %}
+                    
+                    {% if not meetings or not has_actions %}
+                        <div class="text-center py-6 text-slate-400 italic text-xs">No active action items. Summarize a transcript to populate.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Part 2: Archived Summarized Meetings -->
+            <div class="border-t border-white/5 pt-5">
+                <h3 class="text-base font-bold text-slate-200 mb-4 font-heading"><i class="fas fa-box-archive mr-2 text-indigo-400"></i>Summarized Archives</h3>
+                <div class="space-y-3" id="meetings-archives">
+                    {% for m in meetings %}
+                    <div class="p-4 rounded-xl border border-white/5 bg-white/[0.01]">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
+                            <h4 class="text-sm font-bold text-slate-200 font-heading">{{ m.title }}</h4>
+                            <div class="text-[10px] text-slate-400 space-x-2">
+                                <span><i class="fas fa-calendar mr-1"></i>{{ m.date }}</span>
+                                <span>&middot;</span>
+                                <span><i class="fas fa-clock mr-1"></i>{{ m.duration or '30 mins' }}</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed">{{ m.summary }}</p>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-6 text-slate-400 italic text-xs">No summarized meetings in archives.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function submitTranscript(event) {
+        event.preventDefault();
+        const submitBtn = document.getElementById("summarize-submit");
+        const titleInput = document.getElementById("meeting-title");
+        const transcriptInput = document.getElementById("meeting-transcript");
+        
+        const payload = {
+            title: titleInput.value.trim(),
+            transcript: transcriptInput.value.trim()
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<div class="lds-ring"><div></div><div></div><div></div><div></div></div> <span>Analyzing Transcript...</span>`;
+
+        try {
+            await apiFetch("/api/meeting/summarize", {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+            showToast("Meeting summarized and action items logged", "success");
+            titleInput.value = "";
+            transcriptInput.value = "";
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        } catch (error) {
+            console.error(error);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span>Analyze Transcript</span> <i class="fas fa-microchip text-xs"></i>`;
+        }
+    }
+
+    async function toggleActionItem(itemId, checkbox) {
+        const textSpan = document.getElementById(`action-text-${itemId}`);
+        try {
+            const data = await apiFetch(`/api/meeting/action-item/${itemId}/toggle`, {
+                method: "POST"
+            });
+            
+            if (data.status === "Completed") {
+                textSpan.classList.add("line-through", "text-slate-500");
+                showToast("Task marked completed", "success");
+            } else {
+                textSpan.classList.remove("line-through", "text-slate-500");
+                showToast("Task marked pending", "info");
+            }
+        } catch (error) {
+            console.error(error);
+            checkbox.checked = !checkbox.checked; // Revert checkbox state
+        }
+    }
+</script>
+{% endblock %}

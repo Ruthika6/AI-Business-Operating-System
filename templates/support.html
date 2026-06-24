@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top info row -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <p class="text-sm text-slate-400">Automate customer triage, sentiment classification, priority detection, and live chat.</p>
+        </div>
+        <button onclick="toggleTicketModal(true)" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-plus text-xs"></i> Open Support Ticket
+        </button>
+    </div>
+
+    <!-- Main Helpdesk Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Tickets Grid List (Left) -->
+        <div class="glass-panel p-5 lg:col-span-2 space-y-4">
+            <h3 class="text-base font-bold text-slate-200 mb-2 font-heading"><i class="fas fa-ticket mr-2 text-indigo-400"></i>Active Support Tickets</h3>
+            
+            <div class="space-y-3" id="tickets-list">
+                {% for t in tickets %}
+                <div class="p-4 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] transition-all flex flex-col md:flex-row justify-between gap-4">
+                    <div class="space-y-2 max-w-lg">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider 
+                            {% if t.priority == 'Critical' %} badge-glow-critical
+                            {% elif t.priority == 'High' %} badge-glow-high
+                            {% elif t.priority == 'Medium' %} badge-glow-medium
+                            {% else %} badge-glow-low {% endif %}">
+                                {{ t.priority }}
+                            </span>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wide bg-slate-800 px-2 py-0.5 rounded-md">{{ t.category or 'General' }}</span>
+                            <span class="text-xs text-slate-400">Raised by: <strong class="text-slate-300">{{ t.customer_name }}</strong></span>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-200 font-heading">{{ t.subject or 'No Subject' }}</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed line-clamp-2">{{ t.message }}</p>
+                    </div>
+                    
+                    <div class="flex md:flex-col justify-between items-end gap-2 flex-shrink-0">
+                        <span class="text-[10px] text-slate-400 flex items-center gap-1">
+                            Sentiment: <strong class="{% if t.sentiment == 'Negative' %} text-rose-400 {% elif t.sentiment == 'Positive' %} text-emerald-400 {% else %} text-slate-300 {% endif %}">{{ t.sentiment or 'Neutral' }}</strong>
+                        </span>
+                        
+                        <button onclick="triageTicket({{ t.id }})" class="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-300 font-semibold text-xs rounded-lg transition-all flex items-center gap-1.5">
+                            <i class="fas fa-robot text-xs animate-pulse"></i> Triage Draft
+                        </button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-slate-400 italic">No tickets in the queue. Click 'Open Support Ticket' to start.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Chatbot Simulator Playground (Right) -->
+        <div class="glass-panel p-5 flex flex-col justify-between min-h-[500px]">
+            <div class="flex flex-col h-full justify-between">
+                <!-- Chatbot Header -->
+                <div class="border-b border-white/5 pb-3 mb-3">
+                    <h3 class="text-base font-bold text-slate-200 font-heading"><i class="fas fa-comments mr-2 text-indigo-400"></i>AI Chatbot Simulator</h3>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Test the chatbot's live knowledge on company MRR or API webhook issues.</p>
+                </div>
+
+                <!-- Chat history area -->
+                <div id="chat-messages-container" class="flex-grow overflow-y-auto max-h-[350px] space-y-3 p-3 rounded-xl bg-slate-950/20 border border-white/5 text-xs">
+                    <div class="chat-bubble-agent p-3 text-slate-300 leading-relaxed">
+                        Hello! I am the FlowZint AI Support assistant. I am connected to live business operations data. You can ask me questions about your billing duplicates, webhook v2 errors, or MRR statistics. How can I help you?
+                    </div>
+                </div>
+
+                <!-- Chat inputs -->
+                <form id="chat-form" onsubmit="sendChat(event)" class="mt-4 flex gap-2">
+                    <input type="text" id="chat-input" required placeholder="Type support message..." class="glass-input flex-grow px-3 py-2.5 rounded-xl text-xs">
+                    <button type="submit" id="chat-submit" class="btn-primary px-4 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Suggested Reply Draft Overlay Box (Appears when Triage is clicked) -->
+    <div id="reply-draft-panel" class="hidden glass-panel p-6 border border-indigo-500/20 bg-indigo-950/5 mt-6 animate-slide-up">
+        <div class="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-square-envelope text-indigo-400 text-lg"></i>
+                <h3 class="text-base font-bold text-slate-200 font-heading">AI Suggested Response Draft</h3>
+            </div>
+            <button onclick="closeDraftPanel()" class="text-slate-400 hover:text-slate-200 text-sm"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                <div>
+                    <span class="text-slate-400">Priority:</span>
+                    <strong id="draft-priority" class="text-slate-200 block mt-0.5">High</strong>
+                </div>
+                <div>
+                    <span class="text-slate-400">Sentiment:</span>
+                    <strong id="draft-sentiment" class="text-slate-200 block mt-0.5">Negative</strong>
+                </div>
+                <div>
+                    <span class="text-slate-400">Detected Category:</span>
+                    <strong id="draft-category" class="text-slate-200 block mt-0.5">Billing Cycles</strong>
+                </div>
+                <div>
+                    <span class="text-slate-400">Ticket Status:</span>
+                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 inline-block mt-0.5">Assigned Draft</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-950/40 border border-white/5 rounded-xl p-4">
+                <div id="draft-reply-content" class="text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-all">
+                    Draft reply will render here...
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3">
+                <button onclick="copyDraftText()" class="px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-xl transition-all font-semibold text-xs flex items-center gap-1.5">
+                    <i class="fas fa-copy"></i> Copy Draft
+                </button>
+                <button onclick="closeDraftPanel()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 rounded-xl transition-all font-semibold text-xs">
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Open Ticket Modal Overlay -->
+<div id="ticket-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md p-6 bg-slate-900/90 relative animate-slide-up">
+        <!-- Close Button -->
+        <button onclick="toggleTicketModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 class="text-lg font-bold text-slate-100 mb-4 font-heading border-b border-white/5 pb-2">Open New Support Ticket</h3>
+        <form onsubmit="saveTicket(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Customer Name</label>
+                <input type="text" id="modal-customer" required placeholder="e.g. David Kim" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Email</label>
+                    <input type="email" id="modal-email" required placeholder="e.g. david@kimtech.net" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Category</label>
+                    <select id="modal-category" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+                        <option value="Technical API">Technical API</option>
+                        <option value="Billing">Billing</option>
+                        <option value="UI Cosmetic">UI Cosmetic</option>
+                        <option value="General Support">General Support</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Subject</label>
+                <input type="text" id="modal-subject" required placeholder="e.g. Invalid signature on webhooks" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Ticket Message</label>
+                <textarea id="modal-message" required placeholder="Describe the problem in detail..." rows="4" class="glass-input w-full px-4 py-2.5 rounded-xl text-sm"></textarea>
+            </div>
+            <button type="submit" class="w-full btn-primary py-3 rounded-xl font-bold text-sm">
+                Register Ticket
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleTicketModal(show) {
+        const modal = document.getElementById("ticket-modal");
+        modal.classList.toggle("hidden", !show);
+    }
+
+    async function saveTicket(event) {
+        event.preventDefault();
+        const payload = {
+            customer_name: document.getElementById("modal-customer").value,
+            email: document.getElementById("modal-email").value,
+            subject: document.getElementById("modal-subject").value,
+            category: document.getElementById("modal-category").value,
+            message: document.getElementById("modal-message").value,
+            priority: "Medium",
+            status: "Open"
+        };
+
+        try {
+            await apiFetch("/api/support/tickets", {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+            showToast("Ticket successfully opened", "success");
+            toggleTicketModal(false);
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // Triage ticket
+    async function triageTicket(ticketId) {
+        const panel = document.getElementById("reply-draft-panel");
+        const prioritySpan = document.getElementById("draft-priority");
+        const sentimentSpan = document.getElementById("draft-sentiment");
+        const categorySpan = document.getElementById("draft-category");
+        const contentBox = document.getElementById("draft-reply-content");
+
+        panel.classList.remove("hidden");
+        panel.scrollIntoView({ behavior: 'smooth' });
+        
+        contentBox.innerHTML = `
+            <div class="flex items-center gap-3 text-indigo-400 py-4">
+                <i class="fas fa-spinner animate-spin text-lg"></i>
+                Running ticket triage and suggested reply drafting via Gemini...
+            </div>
+        `;
+
+        try {
+            const data = await apiFetch(`/api/support/analyze/${ticketId}`, {
+                method: "POST"
+            });
+
+            prioritySpan.textContent = data.priority;
+            sentimentSpan.textContent = data.sentiment;
+            categorySpan.textContent = data.category;
+            contentBox.textContent = data.ai_suggested_response;
+            
+            showToast("Ticket triaged successfully", "success");
+            
+        } catch (error) {
+            contentBox.innerHTML = `<div class="text-rose-400 py-4"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to analyze ticket: ${error.message}</div>`;
+        }
+    }
+
+    function closeDraftPanel() {
+        document.getElementById("reply-draft-panel").classList.add("hidden");
+    }
+
+    function copyDraftText() {
+        const text = document.getElementById("draft-reply-content").textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Draft reply copied to clipboard", "success");
+        }).catch(err => {
+            console.error(err);
+        });
+    }
+
+    // Live chatbot simulation
+    let chatHistory = [
+        { role: "model", content: "Hello! I am the FlowZint AI Support assistant. I am connected to live business operations data. You can ask me questions about your billing duplicates, webhook v2 errors, or MRR statistics. How can I help you?" }
+    ];
+
+    async function sendChat(event) {
+        event.preventDefault();
+        const input = document.getElementById("chat-input");
+        const submitBtn = document.getElementById("chat-submit");
+        const container = document.getElementById("chat-messages-container");
+
+        const msg = input.value.trim();
+        if (!msg) return;
+
+        // Append user bubble
+        chatHistory.push({ role: "user", content: msg });
+        const userBubble = document.createElement("div");
+        userBubble.className = "chat-bubble-user p-3 text-slate-200 leading-relaxed text-right ml-auto max-w-[80%]";
+        userBubble.textContent = msg;
+        container.appendChild(userBubble);
+        
+        input.value = "";
+        container.scrollTop = container.scrollHeight;
+
+        // Disable elements & append loading spinner bubble
+        input.disabled = true;
+        submitBtn.disabled = true;
+        
+        const loaderBubble = document.createElement("div");
+        loaderBubble.className = "chat-bubble-agent p-3 text-slate-400 leading-relaxed italic max-w-[80%] flex items-center gap-1.5";
+        loaderBubble.id = "chat-loader-bubble";
+        loaderBubble.innerHTML = `<i class="fas fa-circle-notch animate-spin text-indigo-400"></i> Bot is typing...`;
+        container.appendChild(loaderBubble);
+        container.scrollTop = container.scrollHeight;
+
+        try {
+            const data = await apiFetch("/api/support/reply", {
+                method: "POST",
+                body: JSON.stringify({ messages: chatHistory })
+            });
+
+            // Remove loader and append bot bubble
+            document.getElementById("chat-loader-bubble").remove();
+            
+            chatHistory.push({ role: "model", content: data.message });
+            
+            const botBubble = document.createElement("div");
+            botBubble.className = "chat-bubble-agent p-3 text-slate-300 leading-relaxed max-w-[80%]";
+            botBubble.textContent = data.message;
+            container.appendChild(botBubble);
+            
+            container.scrollTop = container.scrollHeight;
+            
+        } catch (error) {
+            document.getElementById("chat-loader-bubble").remove();
+            const errorBubble = document.createElement("div");
+            errorBubble.className = "chat-bubble-agent p-3 text-rose-400 leading-relaxed max-w-[80%]";
+            errorBubble.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Support agent connection offline.`;
+            container.appendChild(errorBubble);
+        } finally {
+            input.disabled = false;
+            submitBtn.disabled = false;
+            input.focus();
+        }
+    }
+</script>
+{% endblock %}

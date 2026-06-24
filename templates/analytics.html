@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <p class="text-sm text-slate-400">Upload business datasets, automate cleaning, run statistical analysis, and generate predictive charts.</p>
+
+    <!-- Main Layout Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- CSV Uploader (Left) -->
+        <div class="glass-panel p-5 space-y-4">
+            <h3 class="text-base font-bold text-slate-200 mb-2 font-heading"><i class="fas fa-upload mr-2 text-indigo-400"></i>Upload Business Dataset</h3>
+            
+            <form id="csv-upload-form" onsubmit="uploadCSV(event)" class="space-y-4">
+                <div class="border-2 border-dashed border-white/10 hover:border-indigo-500/40 rounded-xl p-6 text-center cursor-pointer transition-all bg-white/[0.01]" onclick="document.getElementById('csv-file-input').click()">
+                    <i class="fas fa-cloud-arrow-up text-3xl text-indigo-400 mb-2 animate-bounce"></i>
+                    <p class="text-xs text-slate-300 font-semibold">Drag & drop your CSV or click to browse</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Supports Sales, Marketing, Customer, or Revenue CSVs</p>
+                    <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="fileSelected(this)">
+                </div>
+                
+                <div id="file-selected-badge" class="hidden p-3 rounded-lg border border-white/5 bg-slate-900/60 flex items-center justify-between text-xs">
+                    <span class="text-slate-300 truncate max-w-[180px]" id="selected-filename">filename.csv</span>
+                    <button type="button" onclick="clearFileSelection()" class="text-slate-400 hover:text-rose-400"><i class="fas fa-trash"></i></button>
+                </div>
+                
+                <button type="submit" id="upload-submit-btn" class="w-full btn-primary py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm">
+                    <span>Upload & Process</span>
+                    <i class="fas fa-gear text-xs"></i>
+                </button>
+            </form>
+            
+            <!-- Statistical Summary (Populated after upload) -->
+            <div id="stats-box" class="hidden border-t border-white/5 pt-4 space-y-3">
+                <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Descriptive Statistics</h4>
+                <div class="grid grid-cols-2 gap-3 text-xs bg-slate-950/20 p-3 rounded-xl border border-white/5">
+                    <div>
+                        <span class="text-slate-400">Total Rows:</span>
+                        <strong id="stats-rows" class="block text-slate-200 mt-0.5">-</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400">Total Columns:</span>
+                        <strong id="stats-cols" class="block text-slate-200 mt-0.5">-</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts & Deep Analysis Reports (Right) -->
+        <div class="glass-panel p-5 lg:col-span-2 space-y-6">
+            <!-- Part 1: Interactive Forecast Line Chart -->
+            <div>
+                <h3 class="text-base font-bold text-slate-200 mb-4 font-heading"><i class="fas fa-chart-line mr-2 text-indigo-400"></i>AI Forecast Projections</h3>
+                <div class="h-64 relative w-full bg-slate-950/20 p-3 rounded-xl border border-white/5">
+                    <canvas id="forecastChart"></canvas>
+                    <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-xs text-slate-400 italic">
+                        Upload a dataset to generate forecast lines
+                    </div>
+                </div>
+            </div>
+
+            <!-- Part 2: Detailed Business Trends Report -->
+            <div class="border-t border-white/5 pt-5 space-y-3">
+                <h3 class="text-base font-bold text-slate-200 font-heading"><i class="fas fa-newspaper mr-2 text-indigo-400"></i>AI Narrative Analytical Dossier</h3>
+                
+                <div id="analysis-placeholder" class="text-center py-12 text-slate-400 italic text-xs">
+                    Upload a CSV file to generate automated insights and anomaly reports.
+                </div>
+                
+                <div id="analysis-report-box" class="hidden p-4 rounded-xl border border-white/5 bg-slate-950/40 text-xs text-slate-300 leading-relaxed font-body space-y-2">
+                    <!-- Markdown insights rendered here -->
+                </div>
+            </div>
+
+            <!-- Part 3: Dataset Preview -->
+            <div id="dataset-preview-section" class="hidden border-t border-white/5 pt-5 space-y-3">
+                <h3 class="text-base font-bold text-slate-200 font-heading"><i class="fas fa-table-list mr-2 text-indigo-400"></i>Dataset Preview (First 5 Rows)</h3>
+                <div class="overflow-x-auto w-full max-h-48 border border-white/5 rounded-xl bg-slate-950/20">
+                    <table class="w-full text-left text-[11px] text-slate-300" id="preview-table">
+                        <!-- Table header and rows populated on upload -->
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let forecastChart = null;
+
+    function fileSelected(input) {
+        if (input.files && input.files[0]) {
+            const filename = input.files[0].name;
+            document.getElementById("selected-filename").textContent = filename;
+            document.getElementById("file-selected-badge").classList.remove("hidden");
+        }
+    }
+
+    function clearFileSelection() {
+        document.getElementById("csv-file-input").value = "";
+        document.getElementById("file-selected-badge").classList.add("hidden");
+    }
+
+    async function uploadCSV(event) {
+        event.preventDefault();
+        const input = document.getElementById("csv-file-input");
+        const submitBtn = document.getElementById("upload-submit-btn");
+
+        if (!input.files || input.files.length === 0) {
+            showToast("Please select a CSV file first", "error");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", input.files[0]);
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<div class="lds-ring"><div></div><div></div><div></div><div></div></div> <span>Processing...</span>`;
+
+        try {
+            const response = await fetch("/api/analytics/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || "Failed to process CSV file");
+            }
+
+            const data = await response.json();
+            
+            showToast("CSV dataset processed successfully", "success");
+            
+            // 1. Populate Statistics
+            document.getElementById("stats-rows").textContent = data.stats.rows_count;
+            document.getElementById("stats-cols").textContent = data.stats.columns.length;
+            document.getElementById("stats-box").classList.remove("hidden");
+
+            // 2. Render Markdown Analysis
+            const reportBox = document.getElementById("analysis-report-box");
+            document.getElementById("analysis-placeholder").classList.add("hidden");
+            reportBox.classList.remove("hidden");
+            
+            reportBox.innerHTML = escapeHTML(data.analysis)
+                .replace(/^### (.*$)/gim, '<h4 class="text-xs font-bold text-indigo-400 mt-3 mb-1 font-heading uppercase tracking-wide">$1</h4>')
+                .replace(/^## (.*$)/gim, '<h3 class="text-sm font-bold text-slate-100 mt-4 mb-2 font-heading">$1</h3>')
+                .replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc text-slate-300 my-1">$1</li>')
+                .replace(/^- (.*$)/gim, '<li class="ml-4 list-disc text-slate-300 my-1">$1</li>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong class="text-indigo-300 font-semibold">$1</strong>')
+                .replace(/\n/g, '<br>');
+
+            // 3. Render Chart
+            renderChart(data.forecastData);
+
+            // 4. Render Table Preview
+            renderTablePreview(data.sample_data, data.stats.columns);
+
+        } catch (error) {
+            console.error(error);
+            showToast(error.message, "error");
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span>Upload & Process</span> <i class="fas fa-gear text-xs"></i>`;
+        }
+    }
+
+    function renderChart(forecastData) {
+        const placeholder = document.getElementById("chart-placeholder");
+        if (placeholder) placeholder.remove();
+
+        const ctx = document.getElementById("forecastChart").getContext("2d");
+        const labels = forecastData.map(d => d.month);
+        const revenues = forecastData.map(d => d.revenue);
+
+        // Highlight projections with a different color/border style
+        const segmentBorders = [];
+        const segmentBackgrounds = [];
+        
+        forecastData.forEach((d, idx) => {
+            if (d.month.includes("(Proj)")) {
+                segmentBorders.push("rgba(168, 85, 247, 1)"); // Purple for projection
+                segmentBackgrounds.push("rgba(168, 85, 247, 0.2)");
+            } else {
+                segmentBorders.push("rgba(99, 102, 241, 1)"); // Indigo for actual
+                segmentBackgrounds.push("rgba(99, 102, 241, 0.2)");
+            }
+        });
+
+        if (forecastChart) {
+            forecastChart.destroy();
+        }
+
+        forecastChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Monthly Growth Revenue ($)',
+                    data: revenues,
+                    backgroundColor: segmentBackgrounds,
+                    borderColor: segmentBorders,
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#94a3b8',
+                            font: { family: 'Outfit', size: 10 }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 9 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 9 } }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderTablePreview(rows, columns) {
+        const table = document.getElementById("preview-table");
+        document.getElementById("dataset-preview-section").classList.remove("hidden");
+        table.innerHTML = "";
+
+        // Build header
+        let headerRow = '<tr class="border-b border-white/10 text-slate-400 uppercase text-[10px] bg-slate-900/60 font-semibold">';
+        columns.forEach(col => {
+            headerRow += `<th class="py-2 px-3 font-semibold truncate max-w-[120px]">${escapeHTML(col)}</th>`;
+        });
+        headerRow += '</tr>';
+        
+        let bodyContent = '';
+        rows.forEach(row => {
+            bodyContent += '<tr class="border-b border-white/5 hover:bg-white/[0.01] transition-colors">';
+            columns.forEach(col => {
+                bodyContent += `<td class="py-2 px-3 truncate max-w-[120px]" title="${escapeHTML(String(row[col]))}">${escapeHTML(String(row[col]))}</td>`;
+            });
+            bodyContent += '</tr>';
+        });
+
+        table.innerHTML = headerRow + bodyContent;
+    }
+</script>
+{% endblock %}
