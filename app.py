@@ -30,12 +30,7 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(BASE_DIR, "static")
 
-# Ensure static directories exist
-os.makedirs(os.path.join(static_dir, "css"), exist_ok=True)
-os.makedirs(os.path.join(static_dir, "js"), exist_ok=True)
-os.makedirs(os.path.join(static_dir, "images"), exist_ok=True)
-
-# Mount static folder
+# Mount static folder (directories must already exist in repo)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Include Routers
