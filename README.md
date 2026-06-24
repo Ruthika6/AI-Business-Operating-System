@@ -1,6 +1,6 @@
-# FlowZint AI — Business Operating System
+ AI Business Operating System
 
-FlowZint AI is a production-ready, AI-powered Business Operating System built specifically for the FlowZint AI Hackathon (Open Innovation Category). 
+AI-powered Business Operating System built specifically for the FlowZint AI Hackathon (Open Innovation Category). 
 
 This platform serves as a centralized control center for startups and enterprises, using Google Gemini to automate business strategy, sales CRM activities, customer support triaging, meeting minutes summarization, and CSV data analytics.
 
